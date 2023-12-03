@@ -1,5 +1,16 @@
 from copy import deepcopy
 import pandas as pd
+from numba import njit, set_num_threads
+import time
+
+@njit(parallel=True)
+def findBaseSolution(b, c, table):
+    for el in range(0, len(b)):  # Проверка на допустимость решения
+        if (table[el][0] < 0):
+            for i in range(0, len(c)):
+                if (table[el][i + 1] < 0):
+                    return [el, i + 1]
+    return []
 
 class Simplex:
 
@@ -8,8 +19,6 @@ class Simplex:
         self.a = a
         self.b = b
         self.table = []
-
-        self.flag = -1;
 
         for i in range(0, len(self.b)):
             self.table.append([b[i]] + a[i])
@@ -26,11 +35,12 @@ class Simplex:
 
         print("Finish init")
 
-    def findResolvingColumn(self, Not):
+
+    def findResolvingColumn(self):
 
         indexOfResolvingColumn = 0
         for i in range(0, len(self.c)):
-            if (self.table[-1][i + 1] > 0 and (i + 1) != Not):
+            if (self.table[-1][i + 1] > 0):
                 indexOfResolvingColumn = i + 1
                 break
 
@@ -59,16 +69,14 @@ class Simplex:
 
         return indexOfResolvingString
 
-    def findResolvingElement(self, flag, ResEl):
-        if flag == 0:
-            resolvingColumn = self.findResolvingColumn(ResEl[1])
-        else:
-            resolvingColumn = self.findResolvingColumn(-1)
-
+    def findResolvingElement(self):
+        resolvingColumn = self.findResolvingColumn()
         resolvingString = self.findResolvingString(resolvingColumn)
 
         return [resolvingString, resolvingColumn]
 
+    """
+    @njit(parallel=True)
     def findBaseSolution(self):
         for el in range(0, len(self.b)): # Проверка на допустимость решения
             if (self.table[el][0] < 0):
@@ -76,6 +84,7 @@ class Simplex:
                     if (self.table[el][i + 1] < 0):
                         return [el, i + 1]
         return []
+    """
 
     def findOptSolution(self):
         for i in range(1, len(self.table[-1])):
@@ -111,38 +120,29 @@ class Simplex:
         self.string2[r] = buf
 
     def RunSimplex(self):
+
         Solution = [1]
         resolvingElement = [0, 0]
         self.printTable()
+
+        set_num_threads(2)
         while Solution != []:
-            Solution = self.findBaseSolution()
+            #Solution = self.findBaseSolution()
+            Solution = findBaseSolution(self.b, self.c, self.table)
             if(Solution != []):
                 self.JordanExceptionsStep(Solution)
                 self.printTable()
 
         while self.findOptSolution():
-            resolvingElement = self.findResolvingElement(self.flag, resolvingElement)
-
+            resolvingElement = self.findResolvingElement()
             self.JordanExceptionsStep(resolvingElement)
-            self.printTable()
-            Solution = self.findBaseSolution()
-            if (Solution != []):
-                self.JordanExceptionsStep(Solution)
-                self.printTable()
-            if Solution == resolvingElement:
-                self.flag = 0
-                resolvingElement = self.findResolvingElement(self.flag, resolvingElement)
-                self.flag = -1
-                self.JordanExceptionsStep(resolvingElement)
-            else:
-                self.JordanExceptionsStep(Solution)
             self.printTable()
 
 
         print("     Оптимальное решение: \n")
         for i in range(0, len(self.table) - 1):
            print (self.string2[i] + " = ", self.table[i][0])
-        print("F = " , self.table[3][0])
+        print("F = " , self.table[len(self.b)][0])
 
     def printTable(self):
         print("_____")
